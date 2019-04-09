@@ -255,6 +255,7 @@ void pfSegAll(pathfinding_t * self,int segsize){
     int rbn=0;
     int lpn=0;
     int rpn=0;
+    int count=0;
     while(1){
         
         if(i >= self->H-1)
@@ -290,7 +291,9 @@ void pfSegAll(pathfinding_t * self,int segsize){
         self->segs[index].rightBlackPrecent=(float)rbn/(float)rpn;
         
         i=i+segsize+1;
+        ++count;
     }
+    self->resultSegNum=count;
 }
 void pfGetSegCenter(pfSeg_t * seg){
     float lt,rt;
@@ -340,6 +343,9 @@ int pfHaveCylInSi(pathfinding_t * self,int index,int cmp){
     }
     pfSeg_t * seg=&(self->segs[index]);
     pfSeg_t * pseg=&(self->segs[cmp]);
+    return pfHaveCylInSeg(seg,pseg);
+}
+int pfHaveCylInSeg(pfSeg_t * seg,pfSeg_t * pseg){
     int cyleft,cyright;
     
     //left，转弯斜率为正数

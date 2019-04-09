@@ -95,6 +95,9 @@ typedef struct pathfinding{
     int lineThres;//点数比前后相差多少判断为横线
     float blackDelta;//黑色区域阈值
     float whiteDelta;//白色区域阈值
+    
+    int resultSegNum;
+    
 }pathfinding_t;
 
 
@@ -149,6 +152,7 @@ void pfUnpers(pathfinding_t * self);
 int pfHaveCrossInSi(pathfinding_t * self,int index);
 
 int pfHaveCylInSi(pathfinding_t * self,int index,int cmp);
+int pfHaveCylInSeg(pfSeg_t * seg,pfSeg_t * pseg);
 //1:left 
 //2:right
 //3:both

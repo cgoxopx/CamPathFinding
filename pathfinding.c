@@ -116,10 +116,12 @@ void pfUnpers(pathfinding_t * self){
     }
 }
 
-int pfLinearFit(pfPoint_t * buf,int len,pfLine_t * out){
+int pfLinearFit(pfPoint_t * buf,int len,pfLine_t * out,float * averageDelta){
     int i;
     int sx=0,sy=0;
     float ax,ay;
+    int sumYLeft=0,sumYRight=0;
+    int sumYLeftNum=0,sumYRightNum=0;
     float sup=0,sdown=0;
     
     if(len<=0)
@@ -135,7 +137,27 @@ int pfLinearFit(pfPoint_t * buf,int len,pfLine_t * out){
     for(i=0;i<len;++i){
         sup     +=(buf[i].x-ax)*(buf[i].y-ay);
         sdown   +=(buf[i].x-ax)*(buf[i].x-ax);
+        
+        //get averageDelta
+        if(buf[i].y>ay){
+            ++sumYLeftNum;
+            sumYLeft+=buf[i].y;
+        }else{
+            ++sumYRightNum;
+            sumYRight+=buf[i].y;
+        }
+        
     }
+    
+    
+    if(sumYLeftNum<=0 || sumYRightNum<=0){
+        *averageDelta=0;
+    }else{
+        *averageDelta=((float)sumYLeft)/((float)sumYLeftNum)-((float)sumYRight)/((float)sumYRightNum);
+        if(*averageDelta < 0)
+            *averageDelta=-(*averageDelta);
+    }
+    
     if(sdown==0)
         return 0;
     out->a = sup / sdown;
@@ -152,18 +174,48 @@ void pfCreateSeg(
     int * lnum,
     int * rnum,
     int * lex,
-    int * rex
+    int * rex,
+    int * lbn,
+    int * rbn,
+    int * lpn,
+    int * rpn,
+    float * lave,
+    float * rave
 ){
     int tx,ty,ly,delta;
     int i,j;
     int il=0,ir=0;
+    int val;
+    
+    (*lbn)=0;
+    (*rbn)=0;
+    (*lpn)=0;
+    (*rpn)=0;
+    
     for(i=0;i<self->W;++i){//x
         for(j=from;j<=to;++j){//y
-            if(self->getBuffer(self->arg,i,j)!=0){
-                tx=-j;
-                ty= i;
-                ly=tx*self->a+self->b;
-                delta=ty-ly;
+            val=self->getBuffer(self->arg,i,j);
+            
+            tx=-j;
+            ty= i;
+            ly=tx*self->a+self->b;
+            delta=ty-ly;
+            
+            if(delta>0)
+                ++(*lpn);
+            else
+                ++(*rpn);
+            
+            if(val!=0){
+                
+                
+                if(delta>0)
+                    ++(*lbn);
+                else
+                    ++(*rbn);
+                
+                if(val!=2)
+                    continue;
                 if(delta>0){//left
                     if(il < self->segBufferLeftLen){
                         self->segBufferLeft[il].x=tx;
@@ -186,12 +238,12 @@ void pfCreateSeg(
     
     *lnum=il;
     if(il>0){
-        *lex=pfLinearFit(self->segBufferLeft,il,left);
+        *lex=pfLinearFit(self->segBufferLeft,il,left,lave);
     }
     
     *rnum=ir;
     if(ir>0){
-        *rex=pfLinearFit(self->segBufferRight,ir,right);
+        *rex=pfLinearFit(self->segBufferRight,ir,right,rave);
     }
 }
 
@@ -199,6 +251,10 @@ void pfSegAll(pathfinding_t * self,int segsize){
     int i=0;
     int to;
     int index=0;
+    int lbn=0;
+    int rbn=0;
+    int lpn=0;
+    int rpn=0;
     while(1){
         
         if(i >= self->H-1)
@@ -219,34 +275,137 @@ void pfSegAll(pathfinding_t * self,int segsize){
             &(self->segs[index].leftPointNum),
             &(self->segs[index].rightPointNum),
             &(self->segs[index].leftLineExist),
-            &(self->segs[index].rightLineExist)
+            &(self->segs[index].rightLineExist),
+            &lbn,
+            &rbn,
+            &lpn,
+            &rpn,
+            &(self->segs[index].leftAverage),
+            &(self->segs[index].rightAverage)
         );
+        
+        self->segs[index].from=i;
+        self->segs[index].to=to;
+        self->segs[index].leftBlackPrecent=(float)lbn/(float)lpn;
+        self->segs[index].rightBlackPrecent=(float)rbn/(float)rpn;
         
         i=i+segsize+1;
     }
 }
 void pfGetSegCenter(pfSeg_t * seg){
     float lt,rt;
-    
+    float cent;
+    cent=-(seg->from + seg->to)/2.0f;
+    lt=cent*seg->left.a  + seg->left.b;
+    rt=cent*seg->right.a + seg->right.b;
+    seg->center=lt+rt;
 }
 
-int pfHaveForkInSi(pathfinding_t * self,int * len){
-    
-}
-int pfHaveFork(pathfinding_t * self){
-    
-}
-
-int pfHaveCylInSi(pathfinding_t * self,int * len){
-    
-}
-int pfHaveCyl(pathfinding_t * self){
-    
+int pfHaveCrossInSi(pathfinding_t * self,int index){
+    if(index >= self->segNum || index<0){
+        return 0;
+    }
+    pfSeg_t * ptr=&(self->segs[index]);
+    return (pfFilledWhite(self,index));
 }
 
-int pfHaveCurveInSi(pathfinding_t * self,int * len){
-    
+void getEdge(pathfinding_t * self){
+    int i,j;
+    int u,v,du,dv;
+    for(i=0;i<self->W;++i){//x
+        for(j=0;j<self->H;++j){//y
+            if(self->getBuffer(self->arg,i,j)!=0){
+                for(du=-1;du<2;++du){
+                    for(dv=-1;dv<2;++dv){
+                        u=i+du;
+                        v=j+dv;
+                        if(u<0 || v<0 || u>=self->W || v>=self->H)
+                            continue;
+                        if(self->getBuffer(self->arg,u,v)!=0){
+                            self->setBuffer(self,i,j,2);
+                            goto getPointEnd;
+                        }
+                    }
+                }
+                getPointEnd:
+                continue;
+            }
+        }
+    }
 }
-int pfHaveCurve(pathfinding_t * self){
+
+int pfHaveCylInSi(pathfinding_t * self,int index,int cmp){
+    if(index >= self->segNum || index<0){
+        return 0;
+    }
+    pfSeg_t * seg=&(self->segs[index]);
+    pfSeg_t * pseg=&(self->segs[cmp]);
+    int cyleft,cyright;
     
+    //left，转弯斜率为正数
+    //检测点斜率小于参考点
+    if(seg->left.a < pseg->left.a)//s.a<p.a
+        cyleft=1;
+    else
+        cyleft=0;
+    
+    //right，转弯斜率为负数
+    //检测点斜率大于参考点
+    if(seg->right.a > pseg->right.a)//s.a>p.a
+        cyright=1;
+    else
+        cyright=0;
+    
+    if(cyleft){
+        if(cyright)
+            return 3;
+        else
+            return 1;
+    }else
+        if(cyright)
+            return 2;
+    return 0;
 }
+
+float pfHaveCurveInSi(pathfinding_t * self,int index){
+    if(index >= self->segNum || index<0){
+        return 0;
+    }
+    pfSeg_t * ptr=&(self->segs[index]);
+    return ptr->center;
+}
+
+int pfHaveBlack(pathfinding_t * self,int index){
+    if(index >= self->segNum || index<0){
+        return 0;
+    }
+    pfSeg_t * ptr=&(self->segs[index]);
+    
+    if(ptr->leftBlackPrecent > self->blackDelta){
+        if(ptr->rightBlackPrecent > self->blackDelta)
+            return 3;
+        else
+            return 1;
+    }else
+        if(ptr->rightBlackPrecent > self->blackDelta)
+            return 2;
+    return 0;
+}
+
+int pfFilledWhite(pathfinding_t * self,int index){
+    if(index >= self->segNum || index<0){
+        return 0;
+    }
+    pfSeg_t * ptr=&(self->segs[index]);
+    
+    if(ptr->leftBlackPrecent < self->blackDelta){
+        if(ptr->rightBlackPrecent < self->whiteDelta)
+            return 3;
+        else
+            return 1;
+    }else
+        if(ptr->rightBlackPrecent < self->whiteDelta)
+            return 2;
+    return 0;
+}
+

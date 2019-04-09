@@ -15,10 +15,18 @@ typedef struct pfSeg{
     pfLine_t right;
     int leftPointNum;
     int rightPointNum;
+    float leftBlackPrecent;
+    float rightBlackPrecent;
     int leftLineExist;
     int rightLineExist;
     
-    float center;//左边与右边距离差，表示是否在路中间
+    int from,to;
+    
+    float center;//左边与右边距离差，表示是否在路中间，小于0向右，大于0向左
+    
+    float leftAverage;
+    float rightAverage;
+    
 }pfSeg_t;
 
 typedef struct pathfinding{
@@ -26,13 +34,13 @@ typedef struct pathfinding{
     
     char (*getImage)(void * arg,int x,int y);
     //get pix of input image
-    //return 1 or 0
+    //return 1:black or 0:white
     
     char (*getLine)(void * arg,int x,int y,int id);
     
     char (*getBuffer)(void * arg,int x,int y);
     //get pix of buffer
-    //return 0 or other
+    //return 2:edge 1:black or 0:white
     
     void (*setBuffer)(void * arg,int x,int y,char pix);
     //set pix of buffer
@@ -81,17 +89,16 @@ typedef struct pathfinding{
     pfSeg_t * segs;
     int segNum;
     
-    int leftFirstLineSeg;
-    int rightFirstLineSeg;
-    
     float curveThres;//斜率与第一个seg相差多少判断为转弯
     //int segPointAverage;
     int cyThres;//左右点相差多少判断为环
     int lineThres;//点数比前后相差多少判断为横线
+    float blackDelta;//黑色区域阈值
+    float whiteDelta;//白色区域阈值
 }pathfinding_t;
 
 
-int pfLinearFit(pfPoint_t * buf,int len,pfLine_t * out);
+int pfLinearFit(pfPoint_t * buf,int len,pfLine_t * out,float * averageDelta);
 
 void pfCreateSeg(
     pathfinding_t * self,
@@ -102,7 +109,13 @@ void pfCreateSeg(
     int * lnum,
     int * rnum,
     int * lex,
-    int * rex
+    int * rex,
+    int * lbn,
+    int * rbn,
+    int * lpn,
+    int * rpn,
+    float * lave,
+    float * rave
 );
 
 void pfGetSegCenter(pfSeg_t * seg);
@@ -119,6 +132,8 @@ void pfVec42Vec3(const float * vec,float * out);
 
 void pfFix(pathfinding_t * self,int con);
 
+void getEdge(pathfinding_t * self);
+
 void pfGetPersPosition(pathfinding_t * self,int x,int y,int * ox,int * oy);
 //x y:position in map;
 //ox oy:position in image
@@ -131,22 +146,20 @@ void pfUnpersDe(pathfinding_t * self);
 void pfUnpers(pathfinding_t * self);
 //unperspective the image
 
-int pfHaveForkInSi(pathfinding_t * self,int * len);
-int pfHaveFork(pathfinding_t * self);
+int pfHaveCrossInSi(pathfinding_t * self,int index);
+
+int pfHaveCylInSi(pathfinding_t * self,int index,int cmp);
 //1:left 
 //2:right
 //3:both
 
-int pfHaveCylInSi(pathfinding_t * self,int * len);
-int pfHaveCyl(pathfinding_t * self);
-//1:left 
-//2:right
-//3:both
-
-int pfHaveCurveInSi(pathfinding_t * self,int * len);
+float pfHaveCurveInSi(pathfinding_t * self,int index);
 int pfHaveCurve(pathfinding_t * self);
-//1:left 
-//2:right
-//3:both
+
+int pfFilledWhite(pathfinding_t * self,int index);
+
+int pfHaveBlack(pathfinding_t * self,int index);
+
+int phHaveObst(pathfinding_t * self);
 
 #endif

@@ -27,6 +27,8 @@ typedef struct pfSeg{
     float leftAverage;
     float rightAverage;
     
+    int haveBlack;
+    
 }pfSeg_t;
 
 typedef struct pathfinding{
@@ -88,6 +90,7 @@ typedef struct pathfinding{
     
     pfSeg_t * segs;
     int segNum;
+    int segSize;
     
     float curveThres;//斜率与第一个seg相差多少判断为转弯
     //int segPointAverage;
@@ -133,9 +136,7 @@ void pfVec4xMat4(const float * vec,const float * mat,float * out);
 
 void pfVec42Vec3(const float * vec,float * out);
 
-void pfFix(pathfinding_t * self,int con);
-
-void getEdge(pathfinding_t * self);
+void pfGetEdge(pathfinding_t * self);
 
 void pfGetPersPosition(pathfinding_t * self,int x,int y,int * ox,int * oy);
 //x y:position in map;
@@ -160,10 +161,13 @@ int pfHaveCylInSeg(pfSeg_t * seg,pfSeg_t * pseg);
 float pfHaveCurveInSi(pathfinding_t * self,int index);
 int pfHaveCurve(pathfinding_t * self);
 
-int pfFilledWhite(pathfinding_t * self,int index);
+int pfFilledWhite(pathfinding_t * self,pfSeg_t * ptr);
 
-int pfHaveBlack(pathfinding_t * self,int index);
+int pfHaveBlack(pathfinding_t * self,pfSeg_t * ptr);
 
-int phHaveObst(pathfinding_t * self);
+int pfHaveObst(pathfinding_t * self);
+//return size
+
+void pfParse(pathfinding_t * self);
 
 #endif

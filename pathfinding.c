@@ -255,7 +255,6 @@ void pfSegAll(pathfinding_t * self,int segsize){
     int rbn=0;
     int lpn=0;
     int rpn=0;
-    int count=0;
     while(1){
         
         if(i >= self->H-1)
@@ -289,12 +288,15 @@ void pfSegAll(pathfinding_t * self,int segsize){
         self->segs[index].to=to;
         self->segs[index].leftBlackPrecent=(float)lbn/(float)lpn;
         self->segs[index].rightBlackPrecent=(float)rbn/(float)rpn;
+        pfGetSegCenter(&(self->segs[index]));
+        self->segs[index].haveBlack=pfHaveBlack(self,&(self->segs[index]));
         
         i=i+segsize+1;
-        ++count;
+        ++index;
     }
-    self->resultSegNum=count;
+    self->resultSegNum=index;
 }
+
 void pfGetSegCenter(pfSeg_t * seg){
     float lt,rt;
     float cent;
@@ -309,10 +311,10 @@ int pfHaveCrossInSi(pathfinding_t * self,int index){
         return 0;
     }
     pfSeg_t * ptr=&(self->segs[index]);
-    return (pfFilledWhite(self,index));
+    return (pfFilledWhite(self,ptr));
 }
 
-void getEdge(pathfinding_t * self){
+void pfGetEdge(pathfinding_t * self){
     int i,j;
     int u,v,du,dv;
     for(i=0;i<self->W;++i){//x
@@ -381,11 +383,7 @@ float pfHaveCurveInSi(pathfinding_t * self,int index){
     return ptr->center;
 }
 
-int pfHaveBlack(pathfinding_t * self,int index){
-    if(index >= self->segNum || index<0){
-        return 0;
-    }
-    pfSeg_t * ptr=&(self->segs[index]);
+int pfHaveBlack(pathfinding_t * self,pfSeg_t * ptr){
     
     if(ptr->leftBlackPrecent > self->blackDelta){
         if(ptr->rightBlackPrecent > self->blackDelta)
@@ -398,11 +396,7 @@ int pfHaveBlack(pathfinding_t * self,int index){
     return 0;
 }
 
-int pfFilledWhite(pathfinding_t * self,int index){
-    if(index >= self->segNum || index<0){
-        return 0;
-    }
-    pfSeg_t * ptr=&(self->segs[index]);
+int pfFilledWhite(pathfinding_t * self,pfSeg_t * ptr){
     
     if(ptr->leftBlackPrecent < self->blackDelta){
         if(ptr->rightBlackPrecent < self->whiteDelta)
@@ -413,5 +407,40 @@ int pfFilledWhite(pathfinding_t * self,int index){
         if(ptr->rightBlackPrecent < self->whiteDelta)
             return 2;
     return 0;
+}
+
+int pfHaveObst(pathfinding_t * self){
+    int i;
+    int haveBegin=0;
+    int haveEnd=0;
+    int bp,ep;
+    for(i=0;i < self->resultSegNum;++i){
+        if(self->segs[i].haveBlack==3){
+            if(haveBegin==0){
+                if(i-1 >= 0){
+                    if(self->segs[i-1].haveBlack==0){
+                        haveBegin=1;
+                        bp=i;
+                    }
+                }
+            }else{
+                if(i+1 < self->resultSegNum){
+                    if(self->segs[i+1].haveBlack==0){
+                        haveEnd=1;
+                        ep=i;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    if(haveBegin && haveEnd)
+        return ep-bp+1;
+}
+
+void pfParse(pathfinding_t * self){
+    pfUnpersDe(self);
+    pfGetEdge(self);
+    pfSegAll(self,self->segSize);
 }
 
